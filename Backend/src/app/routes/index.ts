@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { AdminRoutes } from "../module/admin/admin.route";
 import { AppointmentRoutes } from "../module/appointment/appointment.route";
+import { AuthRoutes } from "../module/auth/auth.route";
 import { DoctorRoutes } from "../module/doctor/doctor.route";
 import { DoctorScheduleRoutes } from "../module/doctorSchedule/doctorSchedule.route";
 import { PrescriptionRoutes } from "../module/prescription/prescription.route";
@@ -20,6 +21,7 @@ router.get("/health", (req, res) => {
 });
 
 const moduleRoutes = [
+    { path: "/auth", route: AuthRoutes },
     { path: "/users", route: UserRoutes },
     { path: "/admins", route: AdminRoutes },
     { path: "/doctors", route: DoctorRoutes },
