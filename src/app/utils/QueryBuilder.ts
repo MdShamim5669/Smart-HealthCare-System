@@ -1,23 +1,8 @@
-export interface IQueryOptions {
-    searchTerm?: string;
-    page?: number | string;
-    limit?: number | string;
-    sortBy?: string;
-    sortOrder?: "asc" | "desc";
-    [key: string]: any;
-}
+import { IPaginationMeta, IQueryParams, IQueryResult } from "../interfaces/query.interface";
 
-export interface IPaginationMeta {
-    page: number;
-    limit: number;
-    total: number;
-    totalPage: number;
-}
+export type IQueryOptions = IQueryParams;
+export { IPaginationMeta, IQueryResult };
 
-export interface IQueryResult<T> {
-    meta: IPaginationMeta;
-    data: T[];
-}
 
 interface IPrismaModelDelegate<T> {
     findMany: (args: any) => Promise<T[]>;

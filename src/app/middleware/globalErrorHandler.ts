@@ -4,11 +4,13 @@ import { ZodError } from "zod";
 import { Prisma } from "../../generated/prisma";
 import config from "../config";
 import AppError from "../errorHelpers/AppError";
+import { IErrorSource } from "../interfaces/error.interface";
 
 export const globalErrorHandler: ErrorRequestHandler = (err, req, res, next) => {
     let statusCode: number = status.INTERNAL_SERVER_ERROR;
     let message = "Something went wrong!";
-    let errorSources: Array<{ path: string | number; message: string }> = [];
+    let errorSources: IErrorSource[] = [];
+
 
     if (err instanceof ZodError) {
         statusCode = status.BAD_REQUEST;
