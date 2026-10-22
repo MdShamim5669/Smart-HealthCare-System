@@ -13,6 +13,13 @@ router.post(
     PaymentController.initiatePayment
 );
 
+// SSLCommerz Callbacks
+router.post("/sslcommerz/success", PaymentController.handleSslCommerzSuccess);
+router.post("/sslcommerz/fail", PaymentController.handleSslCommerzFail);
+router.post("/sslcommerz/cancel", PaymentController.handleSslCommerzCancel);
+router.post("/sslcommerz/ipn", PaymentController.handleSslCommerzIpn);
+
+
 router.get(
     "/my-payments",
     checkAuth(Role.PATIENT, Role.DOCTOR),

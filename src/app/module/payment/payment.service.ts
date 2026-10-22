@@ -112,13 +112,19 @@ const handleStripeWebhook = async (payload: Buffer, signature: string) => {
     return { received: true };
 };
 
+import { SSLCommerzService } from "./sslcommerz.service";
+
 /**
- * Initiate Stripe Checkout session for an unpaid appointment
+ * Initiate Payment Checkout session (supports Stripe and SSLCommerz)
  */
-const initiatePayment = async (appointmentId: string, user: IRequestUser) => {
+const initiatePayment = async (
+    appointmentId: string,
+    user: IRequestUser,
+    gateway: "STRIPE" | "SSLCOMMERZ" = "STRIPE"
+) => {
     const appointmentData = await prisma.appointment.findUniqueOrThrow({
         where: { id: appointmentId },
-        include: { doctor: true, payment: true, patient: true },
+        include: { doctor: true, payment: true, patient: true, schedule: true },
     });
 
     if (user.role === Role.PATIENT && appointmentData.patient.email !== user.email) {
@@ -129,6 +135,22 @@ const initiatePayment = async (appointmentId: string, user: IRequestUser) => {
         throw new AppError(status.BAD_REQUEST, "Appointment is already paid");
     }
 
+    const transactionId = appointmentData.payment?.transactionId ?? appointmentData.id;
+
+    // Handle SSLCommerz Gateway
+    if (gateway === "SSLCOMMERZ") {
+        return await SSLCommerzService.initPayment({
+            total_amount: appointmentData.doctor.apointmentFee,
+            tran_id: transactionId,
+            appointmentId: appointmentData.id,
+            cus_name: appointmentData.patient.name,
+            cus_email: appointmentData.patient.email,
+            cus_phone: appointmentData.patient.contactNumber,
+            cus_address: appointmentData.patient.address || "Dhaka, Bangladesh",
+        });
+    }
+
+    // Default to Stripe Gateway (BDT currency)
     const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
         line_items: [
@@ -149,7 +171,7 @@ const initiatePayment = async (appointmentId: string, user: IRequestUser) => {
         cancel_url: `${config.frontend_url}/payment/cancel?appointmentId=${appointmentData.id}`,
         metadata: {
             appointmentId: appointmentData.id,
-            transactionId: appointmentData.payment?.transactionId ?? "",
+            transactionId,
         },
     });
 
@@ -159,10 +181,155 @@ const initiatePayment = async (appointmentId: string, user: IRequestUser) => {
 };
 
 /**
+ * Handle SSLCommerz Payment Success Callback
+ */
+const handleSslCommerzSuccess = async (body: Record<string, any>, queryAppointmentId?: string) => {
+    const appointmentId = (body.value_a as string) || queryAppointmentId;
+    const transactionId = (body.value_b as string) || (body.tran_id as string);
+    const val_id = body.val_id as string;
+
+    if (!appointmentId) {
+        return {
+            redirectUrl: `${config.frontend_url}/payment/fail?reason=Missing appointment ID`,
+        };
+    }
+
+    const appointment = await prisma.appointment.findUnique({
+        where: { id: appointmentId },
+        include: { payment: true, patient: true, doctor: true, schedule: true },
+    });
+
+    if (!appointment) {
+        return {
+            redirectUrl: `${config.frontend_url}/payment/fail?reason=Appointment not found`,
+        };
+    }
+
+    // Idempotency: if already paid, redirect straight to frontend success
+    if (appointment.paymentStatus === PaymentStatus.PAID) {
+        return {
+            redirectUrl: `${config.frontend_url}/payment/success?appointmentId=${appointment.id}`,
+        };
+    }
+
+    let validationData: any = body;
+    if (val_id && config.sslcommerz.store_id) {
+        try {
+            const result = await SSLCommerzService.validatePayment(val_id);
+            if (result.status === "VALID" || result.status === "VALIDATED") {
+                validationData = result;
+            }
+        } catch (valErr) {
+            console.warn("SSLCommerz validation warning:", valErr);
+        }
+    }
+
+    // Atomically mark payment and appointment as PAID
+    await prisma.$transaction(async (tx) => {
+        await tx.payment.updateMany({
+            where: { appointmentId: appointment.id },
+            data: {
+                status: PaymentStatus.PAID,
+                paymentGatewayData: validationData,
+            },
+        });
+
+        await tx.appointment.update({
+            where: { id: appointment.id },
+            data: {
+                paymentStatus: PaymentStatus.PAID,
+            },
+        });
+    });
+
+    // Send confirmation email
+    try {
+        await EmailUtils.sendAppointmentConfirmationEmail(appointment.patient.email, {
+            patientName: appointment.patient.name,
+            doctorName: appointment.doctor.name,
+            appointmentDate: new Date(appointment.schedule.startDate).toLocaleDateString(),
+            startTime: new Date(appointment.schedule.startDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            endTime: new Date(appointment.schedule.endDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            paymentStatus: PaymentStatus.PAID,
+            videoCallingId: appointment.videoCallingId,
+        });
+    } catch (emailErr) {
+        console.warn("Failed to send appointment confirmation email after SSLCommerz payment:", emailErr);
+    }
+
+    return {
+        redirectUrl: `${config.frontend_url}/payment/success?appointmentId=${appointment.id}&transactionId=${transactionId || ""}`,
+    };
+};
+
+/**
+ * Handle SSLCommerz Payment Fail Callback
+ */
+const handleSslCommerzFail = async (body: Record<string, any>, queryAppointmentId?: string) => {
+    const appointmentId = (body.value_a as string) || queryAppointmentId;
+    const errorMsg = body.error || "Payment was rejected or failed";
+    return {
+        redirectUrl: `${config.frontend_url}/payment/fail?appointmentId=${appointmentId || ""}&reason=${encodeURIComponent(errorMsg)}`,
+    };
+};
+
+/**
+ * Handle SSLCommerz Payment Cancel Callback
+ */
+const handleSslCommerzCancel = async (body: Record<string, any>, queryAppointmentId?: string) => {
+    const appointmentId = (body.value_a as string) || queryAppointmentId;
+    return {
+        redirectUrl: `${config.frontend_url}/payment/cancel?appointmentId=${appointmentId || ""}`,
+    };
+};
+
+/**
+ * Handle SSLCommerz IPN (Instant Payment Notification)
+ */
+const handleSslCommerzIpn = async (body: Record<string, any>) => {
+    const val_id = body.val_id as string;
+    const appointmentId = body.value_a as string;
+
+    if (!val_id || !appointmentId) {
+        return { received: true, note: "Invalid IPN payload" };
+    }
+
+    const appointment = await prisma.appointment.findUnique({
+        where: { id: appointmentId },
+    });
+
+    if (!appointment || appointment.paymentStatus === PaymentStatus.PAID) {
+        return { received: true, note: "Already processed or appointment not found" };
+    }
+
+    const validation = await SSLCommerzService.validatePayment(val_id);
+    if (validation.status === "VALID" || validation.status === "VALIDATED") {
+        await prisma.$transaction(async (tx) => {
+            await tx.payment.updateMany({
+                where: { appointmentId },
+                data: {
+                    status: PaymentStatus.PAID,
+                    paymentGatewayData: validation,
+                },
+            });
+            await tx.appointment.update({
+                where: { id: appointmentId },
+                data: {
+                    paymentStatus: PaymentStatus.PAID,
+                },
+            });
+        });
+    }
+
+    return { received: true };
+};
+
+/**
  * Get single payment by ID with ownership verification
  */
 const getPaymentById = async (id: string, user: IRequestUser) => {
     const payment = await prisma.payment.findUnique({
+
         where: { id },
         include: paymentInclude,
     });
@@ -296,8 +463,13 @@ const autoCancelUnpaidAppointments = async () => {
 export const PaymentService = {
     handleStripeWebhook,
     initiatePayment,
+    handleSslCommerzSuccess,
+    handleSslCommerzFail,
+    handleSslCommerzCancel,
+    handleSslCommerzIpn,
     getPaymentById,
     getMyPayments,
     getAllPayments,
     autoCancelUnpaidAppointments,
 };
+

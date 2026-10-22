@@ -6,7 +6,9 @@ import { stripe } from "../../config/stripe";
 import AppError from "../../errorHelpers/AppError";
 import { IRequestUser } from "../../interfaces/requestUser.interface";
 import { prisma } from "../../lib/prisma";
+import { SSLCommerzService } from "../payment/sslcommerz.service";
 import { IBookAppointmentPayload } from "./appointment.interface";
+
 
 // Atomically claims a schedule slot. If another patient already holds it, nothing is updated
 // and we reject, which prevents two patients from booking the same slot.
@@ -97,36 +99,55 @@ const bookAppointment = async (payload: IBookAppointmentPayload, user: IRequestU
         return { appointmentData, paymentData };
     });
 
-    // Create Stripe Checkout Session (BDT currency)
     let paymentSessionUrl: string | null = null;
-    try {
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ["card"],
-            line_items: [
-                {
-                    price_data: {
-                        currency: "bdt",
-                        product_data: {
-                            name: `Appointment with Dr. ${doctorData.name}`,
-                            description: `Consultation fee for appointment`,
-                        },
-                        unit_amount: Math.round(doctorData.apointmentFee * 100),
-                    },
-                    quantity: 1,
-                },
-            ],
-            mode: "payment",
-            success_url: `${config.frontend_url}/payment/success?appointmentId=${result.appointmentData.id}`,
-            cancel_url: `${config.frontend_url}/payment/cancel?appointmentId=${result.appointmentData.id}`,
-            metadata: {
+
+    if (payload.gateway === "SSLCOMMERZ") {
+        try {
+            const sslResult = await SSLCommerzService.initPayment({
+                total_amount: doctorData.apointmentFee,
+                tran_id: transactionId,
                 appointmentId: result.appointmentData.id,
-                transactionId,
-            },
-        });
-        paymentSessionUrl = session.url;
-    } catch (stripeErr) {
-        // If Stripe fails in dev, provide standard fallback URL
-        paymentSessionUrl = `${config.frontend_url}/payment/checkout/${result.paymentData.id}`;
+                cus_name: patientData.name,
+                cus_email: patientData.email,
+                cus_phone: patientData.contactNumber,
+                cus_address: patientData.address || "Dhaka, Bangladesh",
+            });
+            paymentSessionUrl = sslResult.paymentUrl;
+        } catch (sslErr) {
+
+            paymentSessionUrl = `${config.frontend_url}/payment/checkout/${result.paymentData.id}?gateway=sslcommerz`;
+        }
+    } else {
+        // Create Stripe Checkout Session (BDT currency)
+        try {
+            const session = await stripe.checkout.sessions.create({
+                payment_method_types: ["card"],
+                line_items: [
+                    {
+                        price_data: {
+                            currency: "bdt",
+                            product_data: {
+                                name: `Appointment with Dr. ${doctorData.name}`,
+                                description: `Consultation fee for appointment`,
+                            },
+                            unit_amount: Math.round(doctorData.apointmentFee * 100),
+                        },
+                        quantity: 1,
+                    },
+                ],
+                mode: "payment",
+                success_url: `${config.frontend_url}/payment/success?appointmentId=${result.appointmentData.id}`,
+                cancel_url: `${config.frontend_url}/payment/cancel?appointmentId=${result.appointmentData.id}`,
+                metadata: {
+                    appointmentId: result.appointmentData.id,
+                    transactionId,
+                },
+            });
+            paymentSessionUrl = session.url;
+        } catch (stripeErr) {
+            // If Stripe fails in dev, provide standard fallback URL
+            paymentSessionUrl = `${config.frontend_url}/payment/checkout/${result.paymentData.id}`;
+        }
     }
 
     return {
@@ -134,6 +155,7 @@ const bookAppointment = async (payload: IBookAppointmentPayload, user: IRequestU
         paymentUrl: paymentSessionUrl,
     };
 };
+
 
 // Pay Later Book Appointment
 const bookAppointmentWithPayLater = async (payload: IBookAppointmentPayload, user: IRequestUser) => {

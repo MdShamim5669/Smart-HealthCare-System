@@ -111,13 +111,30 @@ Base path: `/api/v1`. The Stripe webhook is `POST /webhook` (outside the base pa
 
 | Method | Path | Access | Description |
 | --- | --- | --- | --- |
-| POST | `/book-appointment` | Patient | Book appointment (Pay Now, returns Stripe URL) |
+| POST | `/book-appointment` | Patient | Book appointment (Pay Now, supports Stripe / SSLCommerz) |
 | POST | `/book-appointment-with-pay-later` | Patient | Book appointment (Pay Later) |
-| POST | `/initiate-payment/:id` | Patient | Get Stripe Checkout link for Pay Later booking |
+| POST | `/initiate-payment/:id` | Patient | Get Checkout link for Pay Later booking |
 | GET | `/my-appointments` | Patient, Doctor | List personal appointments |
 | GET | `/my-single-appointment/:id` | Patient, Doctor | View appointment details |
 | GET | `/all-appointments` | Admin, Super Admin | View all platform appointments |
 | PATCH | `/change-appointment-status/:id` | Roles | Transition appointment status |
+
+### Payments: `/api/v1/payments`
+
+| Method | Path | Access | Description |
+| --- | --- | --- | --- |
+| POST | `/initiate-payment` | Patient | Initiate Stripe / SSLCommerz session (`{ appointmentId, gateway }`) |
+| POST | `/sslcommerz/success` | Public | SSLCommerz IPN / success return handler with validation |
+| POST | `/sslcommerz/fail` | Public | SSLCommerz failure return handler |
+| POST | `/sslcommerz/cancel` | Public | SSLCommerz cancellation return handler |
+| POST | `/sslcommerz/ipn` | Public | SSLCommerz instant payment notification listener |
+| GET | `/my-payments` | Patient, Doctor | List user's payment history with pagination & metadata |
+| GET | `/` | Admin, Super Admin | List all platform payments with QueryBuilder |
+| GET | `/:id` | Authenticated | View payment transaction details |
+| POST | `/auto-cancel` | Admin, Super Admin | Trigger manual auto-cancel for unpaid expired appointments |
+
+Root Webhook: `POST /webhook` (Stripe raw payload signature verification & idempotency check)
+
 
 ### Prescriptions & Reviews
 
