@@ -1,7 +1,9 @@
 import { Server } from "http";
 import app from "./app";
 import config from "./app/config";
+import { initAppointmentCron } from "./app/cron/appointmentCron";
 import { prisma } from "./app/lib/prisma";
+
 
 let server: Server;
 
@@ -11,6 +13,10 @@ async function bootstrap() {
         await prisma.$connect();
         console.log("Database connected successfully via Prisma.");
 
+        // Initialize background cron jobs
+        initAppointmentCron();
+        console.log("Background cron job initialized (unpaid appointment auto-cancellation every 25 mins).");
+
         // Start listening
         server = app.listen(config.port, () => {
             console.log(`Server is running on http://localhost:${config.port}`);
@@ -18,6 +24,7 @@ async function bootstrap() {
             console.log(`API Base: http://localhost:${config.port}/api/v1`);
         });
     } catch (error) {
+
         console.error("Failed to start server:", error);
         process.exit(1);
     }

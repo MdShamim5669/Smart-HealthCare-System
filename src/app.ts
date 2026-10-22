@@ -3,8 +3,8 @@ import cors from "cors";
 import express, { Application, Request, Response } from "express";
 import config from "./app/config";
 import { globalErrorHandler, notFound } from "./app/middleware";
+import { PaymentController } from "./app/module/payment/payment.controller";
 import { IndexRoutes } from "./app/routes";
-
 
 const app: Application = express();
 
@@ -12,11 +12,9 @@ const app: Application = express();
 app.post(
     "/webhook",
     express.raw({ type: "application/json" }),
-    (req: Request, res: Response) => {
-        // Stripe webhook handler will process here
-        res.status(200).json({ received: true });
-    }
+    PaymentController.handleStripeWebhook
 );
+
 
 // Standard Middlewares
 app.use(
