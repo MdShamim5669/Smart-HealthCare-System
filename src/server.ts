@@ -1,9 +1,8 @@
 import { Server } from "http";
 import app from "./app";
 import config from "./app/config";
-import { initAppointmentCron } from "./app/cron/appointmentCron";
+import { initAppointmentCron, stopAppointmentCron } from "./app/cron";
 import { prisma } from "./app/lib/prisma";
-
 
 let server: Server;
 
@@ -15,7 +14,6 @@ async function bootstrap() {
 
         // Initialize background cron jobs
         initAppointmentCron();
-        console.log("Background cron job initialized (unpaid appointment auto-cancellation every 25 mins).");
 
         // Start listening
         server = app.listen(config.port, () => {
@@ -24,7 +22,6 @@ async function bootstrap() {
             console.log(`API Base: http://localhost:${config.port}/api/v1`);
         });
     } catch (error) {
-
         console.error("Failed to start server:", error);
         process.exit(1);
     }
@@ -40,6 +37,7 @@ process.on("unhandledRejection", (error) => {
     console.error("Unhandled Rejection detected:", error);
     if (server) {
         server.close(() => {
+            stopAppointmentCron();
             process.exit(1);
         });
     } else {
@@ -47,15 +45,23 @@ process.on("unhandledRejection", (error) => {
     }
 });
 
-process.on("SIGTERM", async () => {
-    console.log("SIGTERM received. Shutting down gracefully...");
+const handleGracefulShutdown = async (signal: string) => {
+    console.log(`${signal} received. Shutting down gracefully...`);
+    stopAppointmentCron();
     if (server) {
         server.close(async () => {
             await prisma.$disconnect();
             console.log("Server closed and database disconnected.");
             process.exit(0);
         });
+    } else {
+        await prisma.$disconnect();
+        process.exit(0);
     }
-});
+};
+
+process.on("SIGTERM", () => handleGracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => handleGracefulShutdown("SIGINT"));
+
 
 bootstrap();
