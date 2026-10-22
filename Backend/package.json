@@ -1,0 +1,65 @@
+{
+  "name": "ph-healthcare-backend",
+  "version": "1.0.0",
+  "description": "PH Healthcare Management System - Backend REST API",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate dev",
+    "studio": "prisma studio",
+    "lint": "eslint src",
+    "stripe:webhook": "stripe listen --forward-to localhost:5000/webhook"
+  },
+  "prisma": {
+    "schema": "prisma/schema"
+  },
+  "keywords": [
+    "healthcare",
+    "express",
+    "typescript",
+    "prisma",
+    "better-auth",
+    "stripe"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.0.0",
+    "@prisma/client": "^7.0.0",
+    "better-auth": "^1.1.18",
+    "cloudinary": "^2.5.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "ejs": "^3.1.10",
+    "express": "^5.0.1",
+    "http-status": "^2.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.10.0",
+    "pg": "^8.13.3",
+    "stripe": "^17.7.0",
+    "uuidv7": "^1.0.2",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.8",
+    "@types/cors": "^2.8.17",
+    "@types/ejs": "^3.1.5",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.13.9",
+    "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^6.4.17",
+    "@types/pg": "^8.11.11",
+    "eslint": "^9.21.0",
+    "prisma": "^7.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

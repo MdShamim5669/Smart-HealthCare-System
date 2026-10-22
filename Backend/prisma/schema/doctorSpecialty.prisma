@@ -1,0 +1,10 @@
+model DoctorSpecialty {
+  doctorId      String
+  specialtiesId String
+
+  doctor      Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  specialties Specialty @relation(fields: [specialtiesId], references: [id], onDelete: Cascade)
+
+  @@id([doctorId, specialtiesId])
+  @@map("doctor_specialties")
+}
