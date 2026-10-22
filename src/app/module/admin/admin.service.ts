@@ -2,12 +2,16 @@ import status from "http-status";
 import { UserStatus } from "../../../generated/prisma";
 import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
+import { QueryBuilder } from "../../utils/QueryBuilder";
 import { IUpdateAdminPayload } from "./admin.interface";
 
-const getAllAdmins = async () => {
-    return await prisma.admin.findMany({
-        where: { isDeleted: false },
-        include: {
+const getAllAdmins = async (query: Record<string, any> = {}) => {
+    return await new QueryBuilder(prisma.admin, query)
+        .where({ isDeleted: false })
+        .search(["name", "email", "contactNumber"])
+        .sort("createdAt", "desc")
+        .paginate()
+        .include({
             user: {
                 select: {
                     id: true,
@@ -16,10 +20,10 @@ const getAllAdmins = async () => {
                     status: true,
                 },
             },
-        },
-        orderBy: { createdAt: "desc" },
-    });
+        })
+        .execute();
 };
+
 
 const getAdminById = async (id: string) => {
     const admin = await prisma.admin.findUnique({

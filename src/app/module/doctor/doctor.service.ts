@@ -2,6 +2,7 @@ import status from "http-status";
 import { Prisma, UserStatus } from "../../../generated/prisma";
 import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
+import { QueryBuilder } from "../../utils/QueryBuilder";
 import { IDoctorFilterRequest, IUpdateDoctorPayload } from "./doctor.interface";
 
 const doctorInclude = {
@@ -13,29 +14,19 @@ const doctorInclude = {
 };
 
 const getAllDoctors = async (filters: IDoctorFilterRequest, options: { page?: number; limit?: number }) => {
-    const page = Number(options.page) || 1;
-    const limit = Number(options.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    const andConditions: Prisma.DoctorWhereInput[] = [{ isDeleted: false }];
-
-    if (filters.searchTerm) {
-        andConditions.push({
-            OR: [
-                { name: { contains: filters.searchTerm, mode: "insensitive" } },
-                { email: { contains: filters.searchTerm, mode: "insensitive" } },
-                { qualification: { contains: filters.searchTerm, mode: "insensitive" } },
-                { designation: { contains: filters.searchTerm, mode: "insensitive" } },
-            ],
-        });
-    }
+    const queryBuilder = new QueryBuilder(prisma.doctor, { ...filters, ...options })
+        .where({ isDeleted: false })
+        .search(["name", "email", "qualification", "designation"])
+        .sort("createdAt", "desc")
+        .paginate()
+        .include(doctorInclude);
 
     if (filters.gender) {
-        andConditions.push({ gender: filters.gender });
+        queryBuilder.where({ gender: filters.gender });
     }
 
     if (filters.specialties) {
-        andConditions.push({
+        queryBuilder.where({
             doctorSpecialties: {
                 some: {
                     specialties: {
@@ -46,29 +37,9 @@ const getAllDoctors = async (filters: IDoctorFilterRequest, options: { page?: nu
         });
     }
 
-    const where: Prisma.DoctorWhereInput = { AND: andConditions };
-
-    const [data, total] = await Promise.all([
-        prisma.doctor.findMany({
-            where,
-            include: doctorInclude,
-            skip,
-            take: limit,
-            orderBy: { createdAt: "desc" },
-        }),
-        prisma.doctor.count({ where }),
-    ]);
-
-    return {
-        meta: {
-            page,
-            limit,
-            total,
-            totalPage: Math.ceil(total / limit),
-        },
-        data,
-    };
+    return await queryBuilder.execute();
 };
+
 
 const getDoctorById = async (id: string) => {
     const doctor = await prisma.doctor.findUnique({
