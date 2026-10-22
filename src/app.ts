@@ -2,9 +2,9 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { Application, Request, Response } from "express";
 import config from "./app/config";
-import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
-import { notFound } from "./app/middleware/notFound";
+import { globalErrorHandler, notFound } from "./app/middleware";
 import { IndexRoutes } from "./app/routes";
+
 
 const app: Application = express();
 
@@ -33,7 +33,7 @@ app.use(express.urlencoded({ extended: true }));
 app.get("/", (req: Request, res: Response) => {
     res.status(200).json({
         success: true,
-        message: "Welcome to PH Healthcare Backend API",
+        message: "Welcome to Smart HealthCare Backend API",
         version: "1.0.0",
         docs: "/api/v1/health",
     });
