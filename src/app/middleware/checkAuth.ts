@@ -10,7 +10,11 @@ import { JwtUtils } from "../utils/jwt";
 export const checkAuth = (...authRoles: Role[]) => {
     return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const sessionToken = CookieUtils.getCookie(req, "better-auth.session_token");
+            const sessionToken =
+                CookieUtils.getCookie(req, "better-auth.session_token") ||
+                (req.headers.authorization?.startsWith("Bearer ")
+                    ? req.headers.authorization.split(" ")[1]
+                    : undefined);
 
             if (!sessionToken) {
                 throw new AppError(status.UNAUTHORIZED, "Unauthorized access! No session token provided.");
