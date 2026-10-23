@@ -12,6 +12,7 @@ export default {
     better_auth: {
         secret: process.env.BETTER_AUTH_SECRET,
         url: process.env.BETTER_AUTH_URL || "http://localhost:5000",
+        api_key: process.env.BETTER_AUTH_API_KEY,
         session_expires_in: Number(process.env.BETTER_AUTH_SESSION_TOKEN_EXPIRES_IN) || 86400,
         session_update_age: Number(process.env.BETTER_AUTH_SESSION_TOKEN_UPDATE_AGE) || 86400,
     },
@@ -21,17 +22,20 @@ export default {
         access_token_expires_in: process.env.ACCESS_TOKEN_EXPIRES_IN || "1d",
         refresh_token_expires_in: process.env.REFRESH_TOKEN_EXPIRES_IN || "7d",
     },
+    resend: {
+        api_key: process.env.RESEND_API_KEY,
+        from: process.env.RESEND_FROM_EMAIL || "PH Healthcare <onboarding@resend.dev>",
+    },
     email: {
-        smtp_user: process.env.EMAIL_SENDER_SMTP_USER,
-        smtp_pass: process.env.EMAIL_SENDER_SMTP_PASS,
-        smtp_host: process.env.EMAIL_SENDER_SMTP_HOST || "smtp.gmail.com",
-        smtp_port: Number(process.env.EMAIL_SENDER_SMTP_PORT) || 587,
-        from: process.env.EMAIL_SENDER_SMTP_FROM || "PH Healthcare <no-reply@phhealthcare.com>",
+        from: process.env.RESEND_FROM_EMAIL || "PH Healthcare <onboarding@resend.dev>",
     },
     google: {
         client_id: process.env.GOOGLE_CLIENT_ID,
         client_secret: process.env.GOOGLE_CLIENT_SECRET,
         callback_url: process.env.GOOGLE_CALLBACK_URL,
+    },
+    gemini: {
+        api_key: process.env.GEMINI_API_KEY,
     },
     cloudinary: {
         cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

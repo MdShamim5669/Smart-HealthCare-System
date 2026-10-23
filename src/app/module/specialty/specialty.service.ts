@@ -1,5 +1,5 @@
 import status from "http-status";
-import { CloudinaryUpload } from "../../config/cloudinary";
+import { CLOUDINARY_FOLDER, uploadToCloudinary } from "../../config/cloudinary";
 import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
 import { ICreateSpecialtyPayload } from "./specialty.interface";
@@ -16,15 +16,8 @@ const createSpecialty = async (payload: ICreateSpecialtyPayload, file?: Express.
     let iconUrl = "https://placehold.co/100x100?text=Specialty";
 
     if (file) {
-        const uploadResult = await new Promise<{ secure_url: string }>((resolve, reject) => {
-            const uploadStream = CloudinaryUpload.uploader.upload_stream(
-                { folder: "ph-healthcare/specialties" },
-                (error, result) => {
-                    if (error || !result) return reject(error);
-                    resolve(result);
-                }
-            );
-            uploadStream.end(file.buffer);
+        const uploadResult = await uploadToCloudinary(file, {
+            folder: CLOUDINARY_FOLDER.SPECIALTY,
         });
         iconUrl = uploadResult.secure_url;
     }

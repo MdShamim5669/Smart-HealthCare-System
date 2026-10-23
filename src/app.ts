@@ -1,7 +1,9 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { Application, Request, Response } from "express";
+import { toNodeHandler } from "better-auth/node";
 import config from "./app/config";
+import { auth } from "./app/lib/auth";
 import { globalErrorHandler, notFound } from "./app/middleware";
 import { PaymentController } from "./app/module/payment/payment.controller";
 import { IndexRoutes } from "./app/routes";
@@ -19,13 +21,30 @@ app.post(
 // Standard Middlewares
 app.use(
     cors({
-        origin: [config.frontend_url, "http://localhost:3000"],
+        origin: (origin, callback) => {
+            if (!origin) return callback(null, true);
+            if (
+                origin.includes("localhost") ||
+                origin.includes("better-auth.com") ||
+                origin.includes("trycloudflare.com") ||
+                origin === config.frontend_url
+            ) {
+                return callback(null, true);
+            }
+            return callback(null, true);
+        },
         credentials: true,
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization", "x-api-key", "Cookie"],
     })
 );
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Better Auth API Route
+app.all("/api/auth/*splat", toNodeHandler(auth));
+app.all("/api/auth", toNodeHandler(auth));
 
 // Root welcome route
 app.get("/", (req: Request, res: Response) => {

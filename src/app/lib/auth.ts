@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { dash } from "@better-auth/infra";
 import config from "../config";
 import { prisma } from "./prisma";
 
@@ -27,4 +28,17 @@ export const auth = betterAuth({
     },
     secret: config.better_auth.secret,
     baseURL: config.better_auth.url,
+    trustedOrigins: [
+        config.frontend_url,
+        "http://localhost:3000",
+        "http://localhost:5000",
+        "https://*.trycloudflare.com",
+        "https://better-auth.com",
+        "https://dash.better-auth.com",
+    ],
+    plugins: [
+        dash({
+            apiKey: config.better_auth.api_key || process.env.BETTER_AUTH_API_KEY || "ba_54ghgd6253oa9ca1qkban5d0f29d5oxq",
+        }),
+    ],
 });

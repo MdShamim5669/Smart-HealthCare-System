@@ -1,18 +1,10 @@
 import fs from "fs";
 import path from "path";
 import ejs from "ejs";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import config from "../config";
 
-const transporter = nodemailer.createTransport({
-    host: config.email.smtp_host,
-    port: config.email.smtp_port,
-    secure: config.email.smtp_port === 465,
-    auth: {
-        user: config.email.smtp_user,
-        pass: config.email.smtp_pass,
-    },
-});
+const resend = new Resend(config.resend.api_key);
 
 const getTemplatePath = (templateName: string): string => {
     const localSrcPath = path.join(process.cwd(), "src", "app", "templates", `${templateName}.ejs`);
@@ -49,6 +41,37 @@ export interface IAppointmentEmailPayload {
     reason?: string;
 }
 
+export interface ISendEmailOptions {
+    to: string | string[];
+    subject: string;
+    html: string;
+    from?: string;
+}
+
+export const sendEmail = async ({ to, subject, html, from }: ISendEmailOptions) => {
+    try {
+        const recipients = Array.isArray(to) ? to : [to];
+        const sender = from || config.resend.from;
+
+        const { data, error } = await resend.emails.send({
+            from: sender,
+            to: recipients,
+            subject,
+            html,
+        });
+
+        if (error) {
+            console.warn("Failed to send email via Resend:", error);
+            return { success: false, error };
+        }
+
+        return { success: true, data };
+    } catch (err) {
+        console.warn("Resend client exception:", err);
+        return { success: false, error: err };
+    }
+};
+
 export const sendOtpEmail = async (to: string, otp: string, name?: string): Promise<void> => {
     try {
         const renderedHtml = await renderEmailTemplate("otp", { otp, name });
@@ -66,14 +89,17 @@ export const sendOtpEmail = async (to: string, otp: string, name?: string): Prom
             </div>
         `;
 
-        await transporter.sendMail({
-            from: config.email.from,
+        const result = await sendEmail({
             to,
             subject: "Your Verification OTP - PH Healthcare",
             html: renderedHtml || fallbackHtml,
         });
+
+        if (!result.success) {
+            console.warn("Failed to send OTP email via Resend, logging OTP for development:", otp);
+        }
     } catch (error) {
-        console.warn("Failed to send email via SMTP, logging OTP for development:", otp);
+        console.warn("Failed to send OTP email via Resend, logging OTP for development:", otp);
     }
 };
 
@@ -95,14 +121,17 @@ export const sendResetPasswordEmail = async (to: string, resetLink: string, name
             </div>
         `;
 
-        await transporter.sendMail({
-            from: config.email.from,
+        const result = await sendEmail({
             to,
             subject: "Reset Your Password - PH Healthcare",
             html: renderedHtml || fallbackHtml,
         });
+
+        if (!result.success) {
+            console.warn("Failed to send reset email via Resend, logging link for development:", resetLink);
+        }
     } catch (error) {
-        console.warn("Failed to send reset email via SMTP, logging link for development:", resetLink);
+        console.warn("Failed to send reset email via Resend, logging link for development:", resetLink);
     }
 };
 
@@ -110,8 +139,7 @@ export const sendAppointmentConfirmationEmail = async (to: string, data: IAppoin
     try {
         const renderedHtml = await renderEmailTemplate("appointmentConfirmation", data);
         if (renderedHtml) {
-            await transporter.sendMail({
-                from: config.email.from,
+            await sendEmail({
                 to,
                 subject: "Appointment Confirmed - PH Healthcare",
                 html: renderedHtml,
@@ -126,8 +154,7 @@ export const sendAppointmentCancellationEmail = async (to: string, data: IAppoin
     try {
         const renderedHtml = await renderEmailTemplate("appointmentCancellation", data);
         if (renderedHtml) {
-            await transporter.sendMail({
-                from: config.email.from,
+            await sendEmail({
                 to,
                 subject: "Appointment Cancelled - PH Healthcare",
                 html: renderedHtml,
@@ -139,9 +166,9 @@ export const sendAppointmentCancellationEmail = async (to: string, data: IAppoin
 };
 
 export const EmailUtils = {
+    sendEmail,
     sendOtpEmail,
     sendResetPasswordEmail,
     sendAppointmentConfirmationEmail,
     sendAppointmentCancellationEmail,
 };
-

@@ -16,7 +16,7 @@ async function bootstrap() {
         initAppointmentCron();
 
         // Start listening
-        server = app.listen(config.port, () => {
+        server = app.listen(config.port, "0.0.0.0", () => {
             console.log(`Server is running on http://localhost:${config.port}`);
             console.log(`Environment: ${config.env}`);
             console.log(`API Base: http://localhost:${config.port}/api/v1`);
