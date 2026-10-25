@@ -10,13 +10,15 @@ import { IndexRoutes } from "./app/routes";
 
 const app: Application = express();
 
+// Security: Disable X-Powered-By header
+app.disable("x-powered-by");
+
 // Stripe Webhook needs the raw payload for signature verification
 app.post(
     "/webhook",
     express.raw({ type: "application/json" }),
     PaymentController.handleStripeWebhook
 );
-
 
 // Standard Middlewares
 app.use(
@@ -35,7 +37,8 @@ app.use(
         },
         credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization", "x-api-key", "Cookie"],
+        allowedHeaders: ["Content-Type", "Authorization", "x-api-key", "Cookie", "x-session-token"],
+        exposedHeaders: ["X-Session-Refresh", "X-Session-Expires-At", "X-Time-Remaining"],
     })
 );
 app.use(cookieParser());

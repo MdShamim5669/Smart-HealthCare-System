@@ -30,10 +30,15 @@ const resetPasswordZodSchema = z.object({
     newPassword: z.string().min(6, "New password must be at least 6 characters"),
 });
 
+const resendOtpZodSchema = z.object({
+    email: z.string().email("Invalid email address"),
+});
+
 export const AuthValidation = {
     registerZodSchema,
     loginZodSchema,
     verifyEmailZodSchema,
+    resendOtpZodSchema,
     changePasswordZodSchema,
     forgetPasswordZodSchema,
     resetPasswordZodSchema,

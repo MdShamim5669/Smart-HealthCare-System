@@ -15,6 +15,7 @@ import {
     ILoginPayload,
     IRegisterPayload,
     IResetPasswordPayload,
+    IResendOtpPayload,
     IVerifyEmailPayload,
 } from "./auth.interface";
 
@@ -107,7 +108,7 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
     await prisma.$transaction(async (tx) => {
         await tx.user.update({
             where: { email: payload.email },
-            data: { status: UserStatus.ACTIVE },
+            data: { status: UserStatus.ACTIVE, emailVerified: true },
         });
 
         await tx.verification.delete({
@@ -117,6 +118,46 @@ const verifyEmail = async (payload: IVerifyEmailPayload) => {
 
     return {
         message: "Email successfully verified. You can now log in.",
+    };
+};
+
+// 2b. Resend Email OTP
+const resendOtp = async (payload: IResendOtpPayload) => {
+    const user = await prisma.user.findUnique({
+        where: { email: payload.email },
+    });
+
+    if (!user || user.isDeleted) {
+        throw new AppError(status.NOT_FOUND, "User does not exist");
+    }
+
+    if (user.status === UserStatus.ACTIVE) {
+        throw new AppError(status.BAD_REQUEST, "Email is already verified. You can log in directly.");
+    }
+
+    if (user.status === UserStatus.BLOCKED || user.status === UserStatus.DELETED) {
+        throw new AppError(status.FORBIDDEN, "Account is blocked or deactivated");
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
+
+    await prisma.verification.deleteMany({
+        where: { identifier: payload.email },
+    });
+
+    await prisma.verification.create({
+        data: {
+            identifier: payload.email,
+            value: otp,
+            expiresAt,
+        },
+    });
+
+    await EmailUtils.sendOtpEmail(payload.email, otp);
+
+    return {
+        message: "A new 6-digit OTP has been sent to your email (expires in 2 minutes).",
     };
 };
 
@@ -149,6 +190,15 @@ const login = async (payload: ILoginPayload) => {
 
     if (!isPasswordValid) {
         throw new AppError(status.UNAUTHORIZED, "Invalid email or password");
+    }
+
+    // Auto-upgrade legacy password hashes to modern iteration count
+    if (PasswordUtils.needsRehash(credentialAccount.password)) {
+        const upgradedHash = PasswordUtils.hashPassword(payload.password);
+        await prisma.account.update({
+            where: { id: credentialAccount.id },
+            data: { password: upgradedHash },
+        }).catch(() => {});
     }
 
     // 1 Day Session for Better Auth
@@ -360,6 +410,7 @@ const logout = async (sessionToken?: string) => {
 export const AuthService = {
     register,
     verifyEmail,
+    resendOtp,
     login,
     getMe,
     refreshToken,

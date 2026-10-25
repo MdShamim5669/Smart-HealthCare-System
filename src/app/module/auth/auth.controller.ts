@@ -34,6 +34,16 @@ const verifyEmail = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+const resendOtp = catchAsync(async (req: Request, res: Response) => {
+    const result = await AuthService.resendOtp(req.body);
+    sendResponse(res, {
+        success: true,
+        httpStatusCode: status.OK,
+        message: result.message,
+        data: null,
+    });
+});
+
 const login = catchAsync(async (req: Request, res: Response) => {
     const result = await AuthService.login(req.body);
 
@@ -82,6 +92,13 @@ const refreshToken = catchAsync(async (req: Request, res: Response) => {
     }
 
     const result = await AuthService.refreshToken(incomingRefreshToken, incomingSessionToken);
+
+    if (incomingSessionToken) {
+        res.cookie("better-auth.session_token", incomingSessionToken, {
+            ...cookieOptions,
+            maxAge: 24 * 60 * 60 * 1000,
+        });
+    }
 
     res.cookie("accessToken", result.accessToken, {
         ...cookieOptions,
@@ -133,6 +150,11 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+const googleCallback = catchAsync(async (req: Request, res: Response) => {
+    const query = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    res.redirect(`/api/auth/callback/google${query}`);
+});
+
 const logout = catchAsync(async (req: Request, res: Response) => {
     const sessionToken = CookieUtils.getCookie(req, "better-auth.session_token");
     await AuthService.logout(sessionToken);
@@ -152,11 +174,13 @@ const logout = catchAsync(async (req: Request, res: Response) => {
 export const AuthController = {
     register,
     verifyEmail,
+    resendOtp,
     login,
     getMe,
     refreshToken,
     changePassword,
     forgetPassword,
     resetPassword,
+    googleCallback,
     logout,
 };
