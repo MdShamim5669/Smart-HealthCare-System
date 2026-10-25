@@ -123,7 +123,7 @@ export const sendResetPasswordEmail = async (to: string, resetLink: string, name
 
         const result = await sendEmail({
             to,
-            subject: "Reset Your Password - PH Healthcare",
+            subject: "Reset Your Password - Smart HealthCare System",
             html: renderedHtml || fallbackHtml,
         });
 
