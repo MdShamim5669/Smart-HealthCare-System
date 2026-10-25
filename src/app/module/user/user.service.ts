@@ -2,6 +2,7 @@ import status from "http-status";
 import { Role } from "../../../generated/prisma";
 import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
+import { PasswordUtils } from "../../utils/password";
 import { ICreateAdminPayload, ICreateDoctorPayload } from "./user.interface";
 
 const createDoctor = async (payload: ICreateDoctorPayload) => {
@@ -13,12 +14,26 @@ const createDoctor = async (payload: ICreateDoctorPayload) => {
         throw new AppError(status.CONFLICT, "User with this email already exists");
     }
 
+    const initialPassword = payload.password || "Doctor123!@#";
+    const hashedPassword = PasswordUtils.hashPassword(initialPassword);
+
     const result = await prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
             data: {
                 email: payload.doctor.email,
                 name: payload.doctor.name,
                 role: Role.DOCTOR,
+                needPasswordChange: true,
+                emailVerified: true,
+            },
+        });
+
+        await tx.account.create({
+            data: {
+                userId: user.id,
+                accountId: user.id,
+                providerId: "credential",
+                password: hashedPassword,
             },
         });
 
@@ -66,6 +81,8 @@ const createAdmin = async (payload: ICreateAdminPayload) => {
     }
 
     const assignedRole = payload.role ?? Role.ADMIN;
+    const initialPassword = payload.password || "Admin123!@#";
+    const hashedPassword = PasswordUtils.hashPassword(initialPassword);
 
     const result = await prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
@@ -73,6 +90,17 @@ const createAdmin = async (payload: ICreateAdminPayload) => {
                 email: payload.admin.email,
                 name: payload.admin.name,
                 role: assignedRole,
+                needPasswordChange: true,
+                emailVerified: true,
+            },
+        });
+
+        await tx.account.create({
+            data: {
+                userId: user.id,
+                accountId: user.id,
+                providerId: "credential",
+                password: hashedPassword,
             },
         });
 

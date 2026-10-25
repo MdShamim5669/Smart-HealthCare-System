@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import status from "http-status";
+import { IRequestUser } from "../../interfaces/requestUser.interface";
 import { catchAsync } from "../../shared/catchAsync";
 import { sendResponse } from "../../shared/sendResponse";
 import { DoctorService } from "./doctor.service";
@@ -38,7 +39,7 @@ const getDoctorById = catchAsync(async (req: Request, res: Response) => {
 });
 
 const updateDoctor = catchAsync(async (req: Request, res: Response) => {
-    const result = await DoctorService.updateDoctor(req.params.id as string, req.body);
+    const result = await DoctorService.updateDoctor(req.params.id as string, req.body, req.user as IRequestUser);
     sendResponse(res, {
         success: true,
         httpStatusCode: status.OK,

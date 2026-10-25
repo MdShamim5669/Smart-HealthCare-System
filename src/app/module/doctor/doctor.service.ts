@@ -1,6 +1,7 @@
 import status from "http-status";
-import { Prisma, UserStatus } from "../../../generated/prisma";
+import { Role, UserStatus } from "../../../generated/prisma";
 import AppError from "../../errorHelpers/AppError";
+import { IRequestUser } from "../../interfaces/requestUser.interface";
 import { prisma } from "../../lib/prisma";
 import { QueryBuilder } from "../../utils/QueryBuilder";
 import { IDoctorFilterRequest, IUpdateDoctorPayload } from "./doctor.interface";
@@ -69,13 +70,17 @@ const getDoctorById = async (id: string) => {
     return doctor;
 };
 
-const updateDoctor = async (id: string, payload: IUpdateDoctorPayload) => {
+const updateDoctor = async (id: string, payload: IUpdateDoctorPayload, user?: IRequestUser) => {
     const doctor = await prisma.doctor.findUnique({
         where: { id },
     });
 
     if (!doctor || doctor.isDeleted) {
         throw new AppError(status.NOT_FOUND, "Doctor not found");
+    }
+
+    if (user && user.role === Role.DOCTOR && doctor.email !== user.email) {
+        throw new AppError(status.FORBIDDEN, "Forbidden access! You can only update your own doctor profile.");
     }
 
     const { specialties, ...doctorData } = payload;
